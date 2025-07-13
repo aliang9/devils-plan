@@ -21,7 +21,7 @@ class GameValidator:
             total_cards += len(player.hand) + len(player.holding_box)
         total_cards += len(state.discard_pile)
         
-        expected_cards = len(state.players) * (state.config.get('hand_size', 9) - 1)
+        expected_cards = len(state.players) * state.config.get('hand_size', 8)
         if total_cards != expected_cards:
             errors.append(f"Card count mismatch: {total_cards} vs {expected_cards}")
         

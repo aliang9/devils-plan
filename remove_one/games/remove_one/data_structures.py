@@ -133,6 +133,7 @@ class RemoveOneState(GameState):
     def _award_points_and_advance(self, winner_id: int, winning_card: int, final_choices: Dict[int, int]) -> 'RemoveOneState':
         """Award points to winner and advance game state"""
         new_players = list(self.players)
+        new_discard_pile = list(self.discard_pile)
         
         winner = new_players[winner_id]
         new_players[winner_id] = dataclasses.replace(
@@ -141,6 +142,8 @@ class RemoveOneState(GameState):
             victory_tokens=winner.victory_tokens + 1,
             last_victory_round=self.round_num
         )
+        
+        new_discard_pile.append(final_choices[winner_id])
         
         for player_id, player in enumerate(new_players):
             if player.eliminated:
@@ -153,6 +156,10 @@ class RemoveOneState(GameState):
                 revealed = self.revealed_cards[player_id]
                 final_choice = final_choices[player_id]
                 
+                for card in revealed:
+                    if card in new_hand:
+                        new_hand.remove(card)
+                
                 if player_id == winner_id:
                     unused_card = next(card for card in revealed if card != final_choice)
                     new_holding_box.append(unused_card)
@@ -160,10 +167,6 @@ class RemoveOneState(GameState):
                     new_holding_box.append(final_choice)
                     unused_card = next(card for card in revealed if card != final_choice)
                     new_hand.append(unused_card)
-                
-                for card in revealed:
-                    if card in new_hand:
-                        new_hand.remove(card)
             
             new_players[player_id] = dataclasses.replace(
                 player,
@@ -175,7 +178,8 @@ class RemoveOneState(GameState):
             players=tuple(new_players),
             phase='select',
             revealed_cards={},
-            final_choices={}
+            final_choices={},
+            discard_pile=tuple(new_discard_pile)
         )
         
         if self.round_num in self.advancement_rounds:
@@ -198,13 +202,13 @@ class RemoveOneState(GameState):
                 revealed = self.revealed_cards[player_id]
                 final_choice = final_choices[player_id]
                 
-                new_holding_box.append(final_choice)
-                unused_card = next(card for card in revealed if card != final_choice)
-                new_hand.append(unused_card)
-                
                 for card in revealed:
                     if card in new_hand:
                         new_hand.remove(card)
+                
+                new_holding_box.append(final_choice)
+                unused_card = next(card for card in revealed if card != final_choice)
+                new_hand.append(unused_card)
             
             new_players[player_id] = dataclasses.replace(
                 player,

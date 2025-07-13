@@ -6,7 +6,7 @@ class RemoveOneConfig:
     
     def __init__(self):
         self.num_players = 7
-        self.hand_size = 9
+        self.hand_size = 8
         self.advancement_rounds = [3, 6, 9, 12, 18]
         self.enable_victory_tokens = True
         self.enable_holding_box = True
