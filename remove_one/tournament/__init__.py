@@ -1,0 +1,3 @@
+"""
+Tournament and competition system.
+"""
