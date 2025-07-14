@@ -1,6 +1,6 @@
 import unittest
 from remove_one.games.remove_one.game import RemoveOneGame
-from remove_one.games.remove_one.data_structures import RemoveOneAction
+from remove_one.games.remove_one.data_structures import RemoveOneAction, RemoveOnePlayer
 from remove_one.utils.config import RemoveOneConfig
 
 
@@ -54,7 +54,30 @@ class TestRemoveOneGameLogic(unittest.TestCase):
     
     def test_elimination_logic(self):
         """Test player elimination at advancement rounds"""
-        pass
+        config = RemoveOneConfig()
+        game = RemoveOneGame(config.to_dict())
+        
+        test_state = game.copy_with_updates(
+            round_num=3,
+            players=tuple(
+                RemoveOnePlayer(
+                    player_id=i,
+                    hand=game.players[i].hand,
+                    holding_box=game.players[i].holding_box,
+                    score=10 if i == 0 else 5,
+                    victory_tokens=2 if i == 0 else 1,
+                    eliminated=False
+                )
+                for i in range(7)
+            )
+        )
+        
+        eliminated_state = test_state._handle_elimination(test_state)
+        
+        self.assertTrue(eliminated_state.players[0].eliminated)
+        
+        for i in range(1, 7):
+            self.assertFalse(eliminated_state.players[i].eliminated)
 
 
 class TestBotImplementations(unittest.TestCase):

@@ -9,35 +9,52 @@ if TYPE_CHECKING:
 from ..core.game_engine import GameEngine
 from ..games.remove_one.game import RemoveOneGame
 from ..utils.config import RemoveOneConfig
+from ..utils.analytics import GameAnalytics
 
 
 class Tournament:
     """Manage bot competitions and rankings"""
     
-    def __init__(self, bots: List['Bot'], config: RemoveOneConfig):
+    def __init__(self, bots: List['Bot'], config=None):
         self.bots = bots
-        self.config = config
+        self.config = config or RemoveOneConfig()
         self.results = TournamentResults()
-        self.game_engine = GameEngine(config.to_dict())
+        self.game_engine = GameEngine(self.config.to_dict() if hasattr(self.config, 'to_dict') else self.config)
+        self.analytics = GameAnalytics()
+        self.elo_ratings = {bot.name: 1000.0 for bot in bots}
+    
+    def run_tournament(self, tournament_type='round_robin', games_per_matchup=10):
+        """Run tournament with specified type"""
+        if tournament_type == 'round_robin':
+            return self.run_round_robin(games_per_matchup)
+        elif tournament_type == 'elimination':
+            return self.run_elimination_bracket()
+        elif tournament_type == 'league':
+            return self.run_league_season()
+        else:
+            return self.run_round_robin(games_per_matchup)
     
     def run_round_robin(self, games_per_matchup: int = 10) -> Dict[str, Any]:
         """Every bot combination plays multiple games"""
         total_matchups = 0
         total_games = 0
         
-        bot_combinations = list(combinations(range(len(self.bots)), 7))
+        max_players = min(len(self.bots), 4)  # Limit to 4 players for better performance
+        if len(self.bots) >= max_players:
+            bot_combinations = list(combinations(range(len(self.bots)), max_players))
+        else:
+            bot_combinations = [tuple(range(len(self.bots)))]
         
         for combo in bot_combinations:
             selected_bots = [self.bots[i] for i in combo]
             
             for game_num in range(games_per_matchup):
-                seed = self.config.random_seed + total_games if self.config.random_seed else None
+                config_dict = self.config.to_dict() if hasattr(self.config, 'to_dict') else self.config
+                config_dict['num_players'] = len(selected_bots)
                 
-                result = self.game_engine.run_game(
-                    RemoveOneGame, 
-                    selected_bots, 
-                    seed=seed
-                )
+                game = RemoveOneGame(config_dict)
+                
+                result = self._play_match_simple(selected_bots, game)
                 
                 self.results.add_game_result(combo, result)
                 total_games += 1
@@ -50,9 +67,95 @@ class Tournament:
             'results': self.results.get_summary(),
         }
     
+    def _play_match_simple(self, bots, game):
+        """Play a simple match between bots"""
+        current_state = game
+        
+        while not current_state.is_terminal():
+            if current_state.phase == 'select':
+                actions = {}
+                for i, bot in enumerate(bots):
+                    if i < len(current_state.players) and not current_state.players[i].eliminated:
+                        bot_state = current_state.get_bot_view(i)
+                        action = bot.get_action(bot_state, i)
+                        actions[i] = action
+                
+                current_state = current_state.apply_simultaneous_actions(actions)
+                
+            elif current_state.phase == 'choose':
+                actions = {}
+                for i, bot in enumerate(bots):
+                    if i < len(current_state.players) and not current_state.players[i].eliminated:
+                        bot_state = current_state.get_bot_view(i)
+                        action = bot.get_action(bot_state, i)
+                        actions[i] = action
+                
+                current_state = current_state.apply_simultaneous_actions(actions)
+        
+        results = current_state.get_results()
+        winner = max(results.items(), key=lambda x: x[1])[0] if results else 0
+        
+        return {
+            'winner': winner,
+            'results': results,
+            'final_state': current_state
+        }
+    
+    def _play_match(self, bot1, bot2):
+        """Play a match between two bots"""
+        config_dict = self.config.to_dict() if hasattr(self.config, 'to_dict') else self.config
+        config_dict['num_players'] = 2
+        
+        game = RemoveOneGame(config_dict)
+        bots = [bot1, bot2]
+        
+        result = self._play_match_simple(bots, game)
+        winner_id = result['winner']
+        
+        return bots[winner_id]
+    
     def run_elimination_bracket(self) -> Dict[str, Any]:
         """Single/double elimination tournament"""
-        pass
+        remaining_bots = [bot for bot in self.bots if not getattr(bot, 'eliminated', False)]
+        if len(remaining_bots) <= 1:
+            return {
+                'tournament_type': 'elimination_bracket',
+                'champion': remaining_bots[0] if remaining_bots else None,
+                'champion_name': remaining_bots[0].name if remaining_bots else 'None',
+                'bracket_results': [],
+                'total_rounds': 0
+            }
+        
+        bracket = remaining_bots[:]
+        bracket_results = []
+        round_num = 1
+        
+        while len(bracket) > 1:
+            next_round = []
+            for i in range(0, len(bracket), 2):
+                if i + 1 < len(bracket):
+                    winner = self._play_match(bracket[i], bracket[i + 1])
+                    next_round.append(winner)
+                    bracket_results.append({
+                        'round': round_num,
+                        'participants': [bracket[i].name, bracket[i + 1].name],
+                        'winner': winner.name
+                    })
+                else:
+                    next_round.append(bracket[i])
+            bracket = next_round
+            round_num += 1
+        
+        champion = bracket[0] if bracket else None
+        champion_idx = self.bots.index(champion) if champion else -1
+        
+        return {
+            'tournament_type': 'elimination_bracket',
+            'champion': champion_idx,
+            'champion_name': champion.name if champion else 'None',
+            'bracket_results': bracket_results,
+            'total_rounds': round_num - 1
+        }
     
     def run_league_season(self, rounds: int = 10) -> Dict[str, Any]:
         """Season-long competition with rankings"""
@@ -61,9 +164,18 @@ class Tournament:
         
         return self.results.get_final_standings()
     
-    def _run_league_round(self, round_num: int):
-        """Run a single league round"""
-        pass
+    def _run_league_round(self, round_num: int = 0):
+        """Run a single league round (all vs all)"""
+        remaining_bots = [bot for bot in self.bots if not getattr(bot, 'eliminated', False)]
+        for i, bot1 in enumerate(remaining_bots):
+            for j, bot2 in enumerate(remaining_bots[i + 1:], i + 1):
+                winner = self._play_match(bot1, bot2)
+                if winner == bot1:
+                    self.elo_ratings[bot1.name] += 10
+                    self.elo_ratings[bot2.name] -= 10
+                else:
+                    self.elo_ratings[bot2.name] += 10
+                    self.elo_ratings[bot1.name] -= 10
 
 
 class TournamentResults:

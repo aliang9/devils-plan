@@ -33,7 +33,7 @@ class MinimaxBot(Bot):
         if depth == 0:
             return self._evaluate_position(state, player_id)
         
-        return random.uniform(-1, 1)
+        return self._evaluate_position(state, player_id)
     
     def _evaluate_position(self, state: 'BotGameState', player_id: int) -> float:
         """Evaluate current position strength"""

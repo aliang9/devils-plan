@@ -14,6 +14,8 @@ class GreedyBot(Bot):
     def get_action(self, state: 'BotGameState', player_id: int) -> 'GameAction':
         if state.public_info['phase'] == 'select':
             hand = sorted(state.private_info['hand'])
+            if len(hand) < 2:
+                return None  # Invalid state, should not happen
             return RemoveOneAction('select_cards', cards=(hand[0], hand[1]))
         
         elif state.public_info['phase'] == 'choose':

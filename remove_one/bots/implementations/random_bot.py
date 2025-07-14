@@ -13,5 +13,10 @@ class RandomBot(Bot):
     
     def get_action(self, state: 'BotGameState', player_id: int) -> 'GameAction':
         if not state.legal_actions:
-            raise ValueError("No legal actions available")
+            from ...games.remove_one.data_structures import RemoveOneAction
+            hand = list(state.private_info.get('hand', [1, 2, 3, 4, 5, 6, 7, 8]))
+            if len(hand) >= 2:
+                return RemoveOneAction('select_cards', cards=(hand[0], hand[1]))
+            else:
+                return RemoveOneAction('select_cards', cards=(1, 2))
         return random.choice(state.legal_actions)

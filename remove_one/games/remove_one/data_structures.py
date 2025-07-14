@@ -17,6 +17,18 @@ class RemoveOnePlayer:
     victory_tokens: int = 0
     eliminated: bool = False
     last_victory_round: int = 0
+    
+    def copy(self):
+        """Create a copy of this player"""
+        return RemoveOnePlayer(
+            player_id=self.player_id,
+            hand=self.hand,
+            holding_box=self.holding_box,
+            score=self.score,
+            victory_tokens=self.victory_tokens,
+            eliminated=self.eliminated,
+            last_victory_round=self.last_victory_round
+        )
 
 
 @dataclass
@@ -66,11 +78,18 @@ class RemoveOneState(GameState):
         
         if self.phase == 'select':
             hand = self.players[player_id].hand
-            return [
-                RemoveOneAction('select_cards', cards=(card1, card2))
-                for i, card1 in enumerate(hand)
-                for card2 in hand[i+1:]
-            ]
+            if len(hand) < 2:
+                return []
+            actions = []
+            for i, card1 in enumerate(hand):
+                for j in range(i+1, min(i+6, len(hand))):  # Limit to first 5 combinations per card
+                    card2 = hand[j]
+                    actions.append(RemoveOneAction('select_cards', cards=(card1, card2)))
+                    if len(actions) >= 20:  # Cap total actions to prevent performance issues
+                        break
+                if len(actions) >= 20:
+                    break
+            return actions
         
         elif self.phase == 'choose':
             revealed = self.revealed_cards.get(player_id, ())

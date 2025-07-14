@@ -1,7 +1,14 @@
+#!/usr/bin/env python3
 """
-Main entry point for Remove One bot simulation system.
-"""
+Remove One Bot Simulation - Main Entry Point
 
+This script demonstrates the core functionality of the Remove One simulation system.
+For more advanced usage:
+- Run unit tests: python run_tests.py
+- Play against bots: python human_vs_bots.py  
+- Run research simulations: python run_simulation.py --help
+"""
+import random
 from remove_one.utils.config import RemoveOneConfig
 from remove_one.core.game_engine import GameEngine
 from remove_one.games.remove_one.game import RemoveOneGame
@@ -10,18 +17,17 @@ from remove_one.bots.implementations.greedy_bot import GreedyBot
 from remove_one.bots.implementations.card_counting_bot import CardCountingBot
 from remove_one.bots.implementations.minimax_bot import MinimaxBot
 from remove_one.tournament.tournament import Tournament
-from remove_one.debug.debugger import GameDebugger, ReplaySystem
-from remove_one.utils.profiler import BotProfiler
 from remove_one.validation.validator import GameValidator
+from remove_one.utils.analytics import GameAnalytics
 
 
 def main():
     """Example usage of the Remove One simulation system"""
+    print("Running basic Remove One simulation demonstration...")
     
     config = RemoveOneConfig()
-    config.games_per_match = 50
-    config.enable_logging = True
-    config.enable_profiling = True
+    config.games_per_match = 10
+    config.enable_logging = False
     
     bots = [
         RandomBot("Random_1"),
@@ -34,9 +40,9 @@ def main():
     ]
     
     tournament = Tournament(bots, config)
-    results = tournament.run_round_robin(games_per_matchup=20)
+    results = tournament.run_round_robin(games_per_matchup=5)
     
-    print("=== TOURNAMENT RESULTS ===")
+    print("\n=== TOURNAMENT RESULTS ===")
     for bot_idx, stats in results['results'].items():
         bot_name = bots[bot_idx].name
         print(f"{bot_name}: {stats['win_rate']:.2%} win rate, {stats['avg_score']:.1f} avg score")
@@ -47,12 +53,11 @@ def main():
     for bot_idx, rating in sorted_ratings:
         print(f"{bots[bot_idx].name}: {rating:.0f}")
     
-    if config.enable_profiling:
-        profiler = BotProfiler()
-        perf_report = profiler.generate_report()
-        print("\n=== PERFORMANCE ANALYSIS ===")
-        for bot_name, metrics in perf_report.items():
-            print(f"{bot_name}: {metrics['avg_decision_time']:.3f}s avg decision time")
+    print("\n=== DEMONSTRATION COMPLETE ===")
+    print("For more advanced features, try:")
+    print("  python run_tests.py      - Run comprehensive test suite")
+    print("  python human_vs_bots.py  - Play against bots interactively")
+    print("  python run_simulation.py - Run research simulations")
 
 
 def run_single_game_debug():
@@ -73,11 +78,9 @@ def run_single_game_debug():
     engine = GameEngine(config.to_dict())
     result = engine.run_game(RemoveOneGame, bots, seed=42)
     
-    debugger = GameDebugger()
-    debugger.debug_game(result)
-    
-    replay_system = ReplaySystem()
-    replay_system.save_game(result, "debug_game_001")
+    print(f"Game completed. Winner: Bot {result['winner']}")
+    print(f"Final scores: {result['results']}")
+    print(f"Game length: {len(result['history'])} actions")
 
 
 def validate_implementation():
@@ -117,5 +120,16 @@ def validate_implementation():
 
 
 if __name__ == "__main__":
+    print("="*60)
+    print("REMOVE ONE BOT SIMULATION SYSTEM")
+    print("="*60)
+    print("Available commands:")
+    print("  python main.py           - Run basic demonstration")
+    print("  python run_tests.py      - Run comprehensive test suite")
+    print("  python human_vs_bots.py  - Play against bots interactively")
+    print("  python run_simulation.py - Run research simulations")
+    print("="*60)
+    print()
+    
     if validate_implementation():
         main()
